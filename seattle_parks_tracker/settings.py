@@ -9,9 +9,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'django-insecure-change-this-in-production-abc123xyz'
 
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['localhost', 'rainbowsignadventure.com', 'www.rainbowsignadventure.com']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -22,6 +22,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'parks',
 ]
+
+CSRF_TRUSTED_ORIGINS = ['http://localhost:8000', 'https://rainbowsignadventure.com', 'https://www.rainbowsignadventure.com']
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
