@@ -218,10 +218,16 @@ def add_visit(request, park_id):
     return render(request, 'parks/add_visit.html', context)
 
 
-@staff_member_required
 @require_http_methods(["POST"])
 def add_visit_ajax(request, park_id):
     """AJAX endpoint for adding a visit with photos. Restricted to admin users."""
+    # Check staff permission manually to return JSON response instead of redirect
+    if not request.user.is_authenticated or not request.user.is_staff:
+        return JsonResponse({
+            'success': False,
+            'error': 'Permission denied. Admin access required.',
+        }, status=403)
+
     park = get_object_or_404(Park, pk=park_id)
 
     form = VisitForm(request.POST, park=park)

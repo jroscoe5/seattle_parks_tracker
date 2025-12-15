@@ -1089,21 +1089,28 @@
                     },
                     body: formData
                 });
-                
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Response not OK:', response.status, errorText);
+                    showToast(`Error: ${response.status} - ${response.statusText}`, true);
+                    return;
+                }
+
                 const data = await response.json();
-                
+
                 if (data.success) {
                     closeModal();
-                    showToast('Visit recorded! 🎉');
-                    
+                    showToast('Visit recorded!');
+
                     // Reload after short delay to update markers
                     setTimeout(() => location.reload(), 1500);
                 } else {
-                    showToast('Error: ' + JSON.stringify(data.errors), true);
+                    showToast('Error: ' + (data.error || JSON.stringify(data.errors)), true);
                 }
             } catch (error) {
-                showToast('Error saving visit', true);
-                console.error(error);
+                showToast('Error saving visit: ' + error.message, true);
+                console.error('Fetch error:', error);
             }
         });
         
