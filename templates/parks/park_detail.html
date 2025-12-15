@@ -1,0 +1,349 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ park.name }} - Rainbow Sign Adventure Map</title>
+    <style>
+        /* Seattle Parks Rainbow Sign Colors */
+        :root {
+            --rainbow-cream: #F5F0E1;
+            --rainbow-red: #C13A28;
+            --rainbow-orange: #E8752A;
+            --rainbow-yellow: #F5C242;
+            --rainbow-green: #3A7D44;
+            --rainbow-blue: #1B5E9E;
+            --sign-frame: #2D3E36;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(90deg, var(--rainbow-red), var(--rainbow-orange), var(--rainbow-green), var(--rainbow-blue));
+            color: var(--rainbow-cream);
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        
+        .header-content {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        .back-link {
+            color: rgba(255,255,255,0.8);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .back-link:hover {
+            color: var(--rainbow-cream);
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        
+        .header .meta {
+            display: flex;
+            gap: 20px;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+        
+        .card {
+            background: var(--rainbow-cream);
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        
+        .card-header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .card-header h2 {
+            color: var(--rainbow-blue);
+            font-size: 1.2rem;
+        }
+        
+        .card-body {
+            padding: 20px;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+        }
+        
+        .btn-primary {
+            background: var(--rainbow-green);
+            color: var(--rainbow-cream);
+        }
+
+        .btn-primary:hover {
+            background: #2d5a35;
+        }
+        
+        .visit-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        
+        .visit-card:last-child {
+            margin-bottom: 0;
+        }
+        
+        .visit-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .visit-date {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .visit-rating {
+            font-size: 1.5rem;
+        }
+        
+        .visit-notes {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+        
+        .visit-photos {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .visit-photo {
+            width: 120px;
+            height: 120px;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+        }
+        
+        .visit-photo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.2s;
+        }
+        
+        .visit-photo:hover img {
+            transform: scale(1.05);
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .empty-state p {
+            margin-bottom: 20px;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
+        }
+        
+        .info-item {
+            padding: 12px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+        
+        .info-item label {
+            font-size: 0.8rem;
+            color: #666;
+            display: block;
+            margin-bottom: 4px;
+        }
+        
+        .info-item span {
+            font-weight: 500;
+            color: #333;
+        }
+        
+        /* Lightbox */
+        .lightbox {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .lightbox.active {
+            display: flex;
+        }
+        
+        .lightbox img {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 8px;
+        }
+        
+        .lightbox-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: none;
+            color: var(--rainbow-cream);
+            font-size: 2rem;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <a href="{% url 'map_view' %}" class="back-link">← Back to Map</a>
+            <h1>{{ park.name }}</h1>
+            <div class="meta">
+                {% if park.neighborhood %}<span>📍 {{ park.neighborhood }}</span>{% endif %}
+                {% if park.acres %}<span>📐 {{ park.acres|floatformat:1 }} acres</span>{% endif %}
+                {% if park.park_type %}<span>🏷️ {{ park.park_type }}</span>{% endif %}
+            </div>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="card">
+            <div class="card-header">
+                <h2>Park Information</h2>
+            </div>
+            <div class="card-body">
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>Status</label>
+                        <span>{% if park.is_visited %}✅ Visited{% else %}⏳ Not visited yet{% endif %}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Total Visits</label>
+                        <span>{{ park.visit_count }}</span>
+                    </div>
+                    {% if park.address %}
+                    <div class="info-item">
+                        <label>Address</label>
+                        <span>{{ park.address }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="info-item">
+                        <label>Coordinates</label>
+                        <span>{{ park.latitude|floatformat:4 }}, {{ park.longitude|floatformat:4 }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h2>Visit History</h2>
+                <a href="{% url 'add_visit' park.id %}" class="btn btn-primary">Add Visit</a>
+            </div>
+            <div class="card-body">
+                {% if visits %}
+                    {% for visit in visits %}
+                    <div class="visit-card">
+                        <div class="visit-header">
+                            <span class="visit-date">{{ visit.visit_date|date:"F j, Y" }}</span>
+                            {% if visit.rating %}
+                            <span class="visit-rating">
+                                {% if visit.rating == 1 %}😭{% elif visit.rating == 2 %}😢{% elif visit.rating == 3 %}😐{% elif visit.rating == 4 %}😊{% elif visit.rating == 5 %}😎{% endif %}
+                            </span>
+                            {% endif %}
+                        </div>
+                        {% if visit.notes %}
+                        <p class="visit-notes">{{ visit.notes }}</p>
+                        {% endif %}
+                        {% if visit.photos.exists %}
+                        <div class="visit-photos">
+                            {% for photo in visit.photos.all %}
+                            <div class="visit-photo" onclick="openLightbox('{{ photo.image.url }}')">
+                                <img src="{{ photo.image.url }}" alt="Visit photo">
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <p>You haven't visited this park yet.</p>
+                        <a href="{% url 'add_visit' park.id %}" class="btn btn-primary">Record Your First Visit</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Lightbox -->
+    <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+        <button class="lightbox-close">&times;</button>
+        <img id="lightbox-img" src="" alt="">
+    </div>
+    
+    <script>
+        function openLightbox(src) {
+            document.getElementById('lightbox-img').src = src;
+            document.getElementById('lightbox').classList.add('active');
+        }
+        
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.remove('active');
+        }
+    </script>
+</body>
+</html>

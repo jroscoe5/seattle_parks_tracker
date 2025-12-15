@@ -1,0 +1,1060 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rainbow Sign Adventure Map</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    
+    <!-- Leaflet MarkerCluster CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system,  BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        }
+        
+        #map {
+            height: calc(100vh - 60px);
+            width: 100%;
+        }
+        
+        /* Seattle Parks Rainbow Sign Colors */
+        :root {
+            --rainbow-cream: #F5F0E1;
+            --rainbow-red: #C13A28;
+            --rainbow-orange: #E8752A;
+            --rainbow-yellow: #F5C242;
+            --rainbow-green: #3A7D44;
+            --rainbow-blue: #1B5E9E;
+            --sign-frame: #2D3E36;
+        }
+
+        .header {
+            height: 60px;
+            background: linear-gradient(90deg, var(--rainbow-red), var(--rainbow-orange), var(--rainbow-green), var(--rainbow-blue));
+            color: var(--rainbow-cream);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 30px;
+            font-size: 0.9rem;
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.3rem;
+            font-weight: bold;
+        }
+        
+        .stat-label {
+            opacity: 0.9;
+            font-size: 0.8rem;
+        }
+        
+        .progress-bar {
+            width: 150px;
+            height: 8px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--rainbow-red), var(--rainbow-orange), var(--rainbow-green), var(--rainbow-blue));
+            transition: width 0.3s ease;
+        }
+        
+        /* Custom marker styles - using rainbow sign colors */
+        .park-marker {
+            background: var(--rainbow-cream);
+            border: 3px solid var(--rainbow-green);
+            border-radius: 50%;
+            width: 24px !important;
+            height: 24px !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .park-marker.visited {
+            background: var(--rainbow-green);
+            border-color: #2d5a35;
+        }
+
+        .park-marker.visited::after {
+            content: '✓';
+            color: var(--rainbow-cream);
+            font-weight: bold;
+        }
+
+        /* Markers for parks WITHOUT rainbow signs (orange from rainbow) */
+        .park-marker.no-sign {
+            background: #FEF3E8;
+            border-color: var(--rainbow-orange);
+        }
+
+        .park-marker.no-sign.visited {
+            background: var(--rainbow-orange);
+            border-color: #b85a1f;
+        }
+
+        /* Small markers for rainbow signs */
+        .rainbow-sign-marker {
+            background: var(--rainbow-cream);
+            border: 2px solid var(--rainbow-blue);
+            border-radius: 50%;
+            width: 12px !important;
+            height: 12px !important;
+        }
+        
+        /* Popup styles */
+        .park-popup {
+            min-width: 280px;
+            max-width: 350px;
+        }
+        
+        .park-popup h3 {
+            color: var(--rainbow-blue);
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+            border-bottom: 2px solid var(--rainbow-cream);
+            padding-bottom: 8px;
+        }
+        
+        .park-popup .info {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 12px;
+        }
+        
+        .park-popup .info p {
+            margin: 4px 0;
+        }
+        
+        .park-popup .visit-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        
+        .park-popup .visit-badge.visited {
+            background: var(--rainbow-cream);
+            color: var(--rainbow-green);
+        }
+
+        .park-popup .visit-badge.not-visited {
+            background: var(--rainbow-cream);
+            color: var(--rainbow-orange);
+        }
+        
+        .park-popup .photo-preview {
+            width: 100%;
+            max-height: 150px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+        
+        .park-popup .btn {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .park-popup .btn-primary {
+            background: var(--rainbow-green);
+            color: var(--rainbow-cream);
+        }
+
+        .park-popup .btn-primary:hover {
+            background: #2d5a35;
+        }
+        
+        .park-popup .btn-secondary {
+            background: var(--rainbow-cream);
+            color: #333;
+        }
+        
+        .park-popup .btn-secondary:hover {
+            background: #bdbdbd;
+        }
+        
+        /* Modal styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal {
+            background: var(--rainbow-cream);
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-header h2 {
+            color: var(--rainbow-blue);
+            font-size: 1.2rem;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: #333;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: var(--rainbow-blue);
+            box-shadow: 0 0 0 3px rgba(27, 94, 158, 0.1);
+        }
+        
+        .emoji-rating {
+            display: flex;
+            gap: 8px;
+        }
+
+        .emoji-rating input {
+            display: none;
+        }
+
+        .emoji-rating label {
+            cursor: pointer;
+            font-size: 1.8rem;
+            opacity: 0.4;
+            transition: opacity 0.2s, transform 0.2s;
+        }
+
+        .emoji-rating label:hover {
+            transform: scale(1.2);
+        }
+
+        .emoji-rating input:checked + label {
+            opacity: 1;
+            transform: scale(1.2);
+        }
+        
+        .photo-upload {
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        
+        .photo-upload:hover {
+            border-color: var(--rainbow-green);
+        }
+
+        .photo-upload.dragover {
+            border-color: var(--rainbow-green);
+            background: #E8F2E9;
+        }
+        
+        .photo-upload input {
+            display: none;
+        }
+        
+        .photo-preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .photo-preview-item {
+            width: 80px;
+            height: 80px;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .photo-preview-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .photo-preview-item .remove {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: rgba(0,0,0,0.6);
+            color: var(--rainbow-cream);
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        /* Legend */
+        .legend {
+            position: absolute;
+            bottom: 30px;
+            left: 10px;
+            background: var(--rainbow-cream);
+            padding: 12px 16px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+            z-index: 1000;
+            font-size: 0.85rem;
+        }
+        
+        .legend h4 {
+            margin-bottom: 8px;
+            color: #333;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 6px 0;
+        }
+        
+        .legend-marker {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 2px solid;
+        }
+        
+        .legend-marker.visited {
+            background: var(--rainbow-green);
+            border-color: #2d5a35;
+        }
+
+        .legend-marker.not-visited {
+            background: var(--rainbow-cream);
+            border-color: var(--rainbow-green);
+        }
+
+        .legend-marker.no-sign-visited {
+            background: var(--rainbow-orange);
+            border-color: #b85a1f;
+        }
+
+        .legend-marker.no-sign {
+            background: #FEF3E8;
+            border-color: var(--rainbow-orange);
+        }
+
+        .legend-boundary {
+            width: 20px;
+            height: 12px;
+            background: rgba(58, 125, 68, 0.2);
+            border: 2px solid var(--rainbow-green);
+            border-radius: 2px;
+        }
+
+        .legend-sign {
+            width: 12px;
+            height: 12px;
+            background: var(--rainbow-yellow);
+            border: 2px solid var(--rainbow-orange);
+            border-radius: 50%;
+        }
+
+        /* Current location marker */
+        .current-location-marker {
+            background: #2196f3;
+            border: 3px solid #1565c0;
+            border-radius: 50%;
+            width: 16px !important;
+            height: 16px !important;
+            box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.3);
+        }
+
+        .legend-location {
+            width: 12px;
+            height: 12px;
+            background: #2196f3;
+            border: 2px solid #1565c0;
+            border-radius: 50%;
+            box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.3);
+        }
+
+        
+        /* Filter controls */
+        .filter-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 10px;
+            z-index: 1000;
+            background: var(--rainbow-cream);
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+        }
+        
+        .filter-controls label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            padding: 4px 0;
+            font-size: 0.9rem;
+        }
+        
+        /* Cluster styles */
+        .marker-cluster-small {
+            background-color: rgba(181, 226, 140, 0.6);
+        }
+        .marker-cluster-small div {
+            background-color: rgba(110, 204, 57, 0.6);
+        }
+        .marker-cluster-medium {
+            background-color: rgba(241, 211, 87, 0.6);
+        }
+        .marker-cluster-medium div {
+            background-color: rgba(240, 194, 12, 0.6);
+        }
+        .marker-cluster-large {
+            background-color: rgba(253, 156, 115, 0.6);
+        }
+        .marker-cluster-large div {
+            background-color: rgba(241, 128, 23, 0.6);
+        }
+        
+        .marker-cluster {
+            background-clip: padding-box;
+            border-radius: 20px;
+        }
+        .marker-cluster div {
+            width: 30px;
+            height: 30px;
+            margin-left: 5px;
+            margin-top: 5px;
+            text-align: center;
+            border-radius: 15px;
+            font: 12px "Helvetica Neue", Arial, Helvetica, sans-serif;
+            font-weight: bold;
+            line-height: 30px;
+        }
+        .marker-cluster span {
+            line-height: 30px;
+        }
+
+        .leafket
+        
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: var(--rainbow-green);
+            color: var(--rainbow-cream);
+            padding: 16px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            z-index: 3000;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+        
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-value">{{ visited_parks }}</div>
+                <div class="stat-label">Parks Visited</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">{{ total_parks }}</div>
+                <div class="stat-label">Total Parks</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">{{ completion_percentage }}%</div>
+                <div class="stat-label"></div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: {{ completion_percentage }}%"></div>
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <div id="map"></div>
+    
+    {% comment %} <div class="legend">
+        <h4>Legend</h4>
+        <div class="legend-item">
+            <div class="legend-marker visited"></div>
+            <span>Rainbow Sign (Visited)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-marker not-visited"></div>
+            <span>Rainbow Sign (Not Visited)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-marker no-sign-visited"></div>
+            <span>No Sign (Visited)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-marker no-sign"></div>
+            <span>No Sign (Not Visited)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-boundary"></div>
+            <span>Park Boundary</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-sign"></div>
+            <span>Rainbow Sign</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-location"></div>
+            <span>Your Location</span>
+        </div>
+    </div> {% endcomment %}
+
+    <div class="filter-controls">
+        <label>
+            <input type="checkbox" id="showVisited" checked>
+            Show Visited
+        </label>
+        <label>
+            <input type="checkbox" id="showUnvisited" checked>
+            Show Unvisited
+        </label>
+        <label>
+            <input type="checkbox" id="showBoundaries">
+            Show Boundaries
+        </label>
+        <label>
+            <input type="checkbox" id="showSigns">
+            Show Rainbow Signs
+        </label>
+    </div>
+    
+    <!-- Visit Modal -->
+    <div class="modal-overlay" id="visitModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>Record Visit to <span id="modalParkName"></span></h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="visitForm" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" id="parkId" name="park_id">
+                    
+                    <div class="form-group">
+                        <label for="visitDate">Visit Date</label>
+                        <input type="date" class="form-control" id="visitDate" name="visit_date" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Worth coming back?</label>
+                        <div class="emoji-rating">
+                            <input type="radio" id="rating1" name="rating" value="1">
+                            <label for="rating1" title="Terrible">😭</label>
+                            <input type="radio" id="rating2" name="rating" value="2">
+                            <label for="rating2" title="Bad">😢</label>
+                            <input type="radio" id="rating3" name="rating" value="3">
+                            <label for="rating3" title="Okay">😐</label>
+                            <input type="radio" id="rating4" name="rating" value="4">
+                            <label for="rating4" title="Good">😊</label>
+                            <input type="radio" id="rating5" name="rating" value="5">
+                            <label for="rating5" title="Amazing">😎</label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="notes">Other thoughts and or observations</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                  placeholder="..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Photos</label>
+                        <div class="photo-upload" id="photoUpload">
+                            <input type="file" id="photoInput" name="photos" multiple accept="image/*">
+                            <p>Click or drag photos here</p>
+                        </div>
+                        <div class="photo-preview-container" id="photoPreview"></div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">
+                        Save Visit
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast notification -->
+    <div class="toast" id="toast"></div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- Leaflet MarkerCluster JS -->
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+    
+    <script>
+        // Initialize map centered on Seattle
+        const map = L.map('map').setView([47.6062, -122.3321], 12);
+        
+        // Add tile layer (OpenStreetMap)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+        
+        // Create marker cluster groups - using rainbow colors
+        const visitedCluster = L.markerClusterGroup({
+            iconCreateFunction: function(cluster) {
+                return L.divIcon({
+                    html: '<div style="background:#3A7D44;color:var(--rainbow-cream);border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-weight:bold;">' + cluster.getChildCount() + '</div>',
+                    className: 'visited-cluster',
+                    iconSize: [40, 40]
+                });
+            }
+        });
+
+        const unvisitedCluster = L.markerClusterGroup({
+            iconCreateFunction: function(cluster) {
+                return L.divIcon({
+                    html: '<div style="background:#F5F0E1;color:#3A7D44;border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-weight:bold;border:2px solid #3A7D44;">' + cluster.getChildCount() + '</div>',
+                    className: 'unvisited-cluster',
+                    iconSize: [40, 40]
+                });
+            }
+        });
+        
+        // Custom icons for parks WITH rainbow signs (green)
+        const visitedIcon = L.divIcon({
+            className: 'park-marker visited',
+            iconSize: [24, 24],
+            iconAnchor: [12, 12],
+            popupAnchor: [0, -12]
+        });
+
+        const unvisitedIcon = L.divIcon({
+            className: 'park-marker',
+            iconSize: [24, 24],
+            iconAnchor: [12, 12],
+            popupAnchor: [0, -12]
+        });
+
+        // Custom icons for parks WITHOUT rainbow signs (orange)
+        const visitedNoSignIcon = L.divIcon({
+            className: 'park-marker no-sign visited',
+            iconSize: [24, 24],
+            iconAnchor: [12, 12],
+            popupAnchor: [0, -12]
+        });
+
+        const unvisitedNoSignIcon = L.divIcon({
+            className: 'park-marker no-sign',
+            iconSize: [24, 24],
+            iconAnchor: [12, 12],
+            popupAnchor: [0, -12]
+        });
+
+        // Small icon for additional rainbow signs
+        const rainbowSignIcon = L.divIcon({
+            className: 'rainbow-sign-marker',
+            iconSize: [12, 12],
+            iconAnchor: [6, 6]
+        });
+
+        // Store all markers and layers
+        let allParks = [];
+        const boundariesLayer = L.layerGroup();
+        const rainbowSignsLayer = L.layerGroup(); // Not added by default
+        
+        // Fetch parks data and add markers
+        fetch('{% url "parks_geojson" %}')
+            .then(response => response.json())
+            .then(data => {
+                data.features.forEach(feature => {
+                    const props = feature.properties;
+                    const coords = feature.geometry.coordinates;
+
+                    // Determine icon based on rainbow sign status and visited status
+                    let icon;
+                    if (props.has_rainbow_sign) {
+                        icon = props.visited ? visitedIcon : unvisitedIcon;
+                    } else {
+                        icon = props.visited ? visitedNoSignIcon : unvisitedNoSignIcon;
+                    }
+
+                    const cluster = props.visited ? visitedCluster : unvisitedCluster;
+
+                    const marker = L.marker([coords[1], coords[0]], { icon: icon });
+
+                    // Build popup content
+                    let popupContent = `
+                        <div class="park-popup">
+                            <h3>${props.name}</h3>
+                            <span class="visit-badge ${props.visited ? 'visited' : 'not-visited'}">
+                                ${props.visited ? '✓ Visited' + (props.visit_count > 1 ? ' ' + props.visit_count + 'x' : '') : 'Not visited yet'}
+                            </span>
+                            ${!props.has_rainbow_sign ? '<br><small style="color:#ff9800;">No rainbow sign</small>' : ''}
+                            <div class="info">
+                                ${props.neighborhood ? `<p>📍 ${props.neighborhood}</p>` : ''}
+                                ${props.acres ? `<p>📐 ${props.acres.toFixed(1)} acres</p>` : ''}
+                                ${props.park_type ? `<p>🏷️ ${props.park_type}</p>` : ''}
+                            </div>
+                    `;
+
+                    if (props.first_photo) {
+                        popupContent += `<img src="${props.first_photo}" class="photo-preview" alt="Park photo">`;
+                    }
+
+                    popupContent += `
+                            <button class="btn btn-primary" onclick="openVisitModal(${props.id}, '${props.name.replace(/'/g, "\\'")}')">
+                                ${props.visited ? 'Add Another Visit' : 'Record Visit'}
+                            </button>
+                            <a href="/parks/${props.id}/" class="btn btn-secondary">View Details</a>
+                        </div>
+                    `;
+
+                    marker.bindPopup(popupContent);
+
+                    // Store park data with marker
+                    allParks.push({
+                        marker: marker,
+                        visited: props.visited,
+                        cluster: cluster
+                    });
+
+                    cluster.addLayer(marker);
+
+                    // Add park boundary polygon if available
+                    if (props.boundary) {
+                        const boundaryColor = props.visited ? '#2e7d32' : (props.has_rainbow_sign ? '#4caf50' : '#ff9800');
+                        const boundaryStyle = {
+                            color: boundaryColor,
+                            weight: 2,
+                            opacity: 0.8,
+                            fillColor: boundaryColor,
+                            fillOpacity: 0.15
+                        };
+
+                        const polygon = L.geoJSON(props.boundary, { style: boundaryStyle });
+
+                        // Clicking boundary opens the same popup as the marker
+                        polygon.on('click', function() {
+                            marker.openPopup();
+                        });
+
+                        boundariesLayer.addLayer(polygon);
+                    }
+
+                    // Add all rainbow sign markers
+                    if (props.rainbow_sign_locations && props.rainbow_sign_locations.length > 0) {
+                        props.rainbow_sign_locations.forEach(signCoords => {
+                            const signMarker = L.marker([signCoords[1], signCoords[0]], { icon: rainbowSignIcon });
+                            signMarker.bindTooltip(`Rainbow Sign - ${props.name}`);
+                            rainbowSignsLayer.addLayer(signMarker);
+                        });
+                    }
+                });
+
+                map.addLayer(visitedCluster);
+                map.addLayer(unvisitedCluster);
+            });
+        
+        // Filter controls
+        document.getElementById('showVisited').addEventListener('change', function() {
+            if (this.checked) {
+                map.addLayer(visitedCluster);
+            } else {
+                map.removeLayer(visitedCluster);
+            }
+        });
+        
+        document.getElementById('showUnvisited').addEventListener('change', function() {
+            if (this.checked) {
+                map.addLayer(unvisitedCluster);
+            } else {
+                map.removeLayer(unvisitedCluster);
+            }
+        });
+
+        document.getElementById('showBoundaries').addEventListener('change', function() {
+            if (this.checked) {
+                map.addLayer(boundariesLayer);
+            } else {
+                map.removeLayer(boundariesLayer);
+            }
+        });
+
+        document.getElementById('showSigns').addEventListener('change', function() {
+            if (this.checked) {
+                map.addLayer(rainbowSignsLayer);
+            } else {
+                map.removeLayer(rainbowSignsLayer);
+            }
+        });
+
+        // Geolocation - show current location on map
+        const locationIcon = L.divIcon({
+            className: 'current-location-marker',
+            iconSize: [16, 16],
+            iconAnchor: [8, 8]
+        });
+
+        let locationMarker = null;
+        let locationCircle = null;
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    const accuracy = position.coords.accuracy;
+
+                    // Add accuracy circle
+                    locationCircle = L.circle([lat, lng], {
+                        radius: accuracy,
+                        color: '#2196f3',
+                        fillColor: '#2196f3',
+                        fillOpacity: 0.1,
+                        weight: 1
+                    }).addTo(map);
+
+                    // Add location marker
+                    locationMarker = L.marker([lat, lng], { icon: locationIcon })
+                        .addTo(map)
+                        //.bindPopup('You are here');
+                },
+                () => {} // Silently fail if denied
+            );
+        }
+
+        // Modal functions
+        function openVisitModal(parkId, parkName) {
+            document.getElementById('parkId').value = parkId;
+            document.getElementById('modalParkName').textContent = parkName;
+            document.getElementById('visitDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('visitModal').classList.add('active');
+            
+            // Clear form
+            document.getElementById('notes').value = '';
+            document.querySelectorAll('.emoji-rating input').forEach(input => input.checked = false);
+            document.getElementById('photoPreview').innerHTML = '';
+            selectedFiles = [];
+        }
+        
+        function closeModal() {
+            document.getElementById('visitModal').classList.remove('active');
+        }
+        
+        // Close modal on overlay click
+        document.getElementById('visitModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+        
+        // Photo upload handling
+        let selectedFiles = [];
+        const photoUpload = document.getElementById('photoUpload');
+        const photoInput = document.getElementById('photoInput');
+        const photoPreview = document.getElementById('photoPreview');
+        
+        photoUpload.addEventListener('click', () => photoInput.click());
+        
+        photoUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            photoUpload.classList.add('dragover');
+        });
+        
+        photoUpload.addEventListener('dragleave', () => {
+            photoUpload.classList.remove('dragover');
+        });
+        
+        photoUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            photoUpload.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+        
+        photoInput.addEventListener('change', () => {
+            handleFiles(photoInput.files);
+        });
+        
+        function handleFiles(files) {
+            Array.from(files).forEach(file => {
+                if (file.type.startsWith('image/')) {
+                    selectedFiles.push(file);
+                    
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const div = document.createElement('div');
+                        div.className = 'photo-preview-item';
+                        div.innerHTML = `
+                            <img src="${e.target.result}" alt="Preview">
+                            <button type="button" class="remove" onclick="removePhoto(this, ${selectedFiles.length - 1})">&times;</button>
+                        `;
+                        photoPreview.appendChild(div);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+        
+        function removePhoto(btn, index) {
+            selectedFiles.splice(index, 1);
+            btn.parentElement.remove();
+        }
+        
+        // Form submission
+        document.getElementById('visitForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const parkId = document.getElementById('parkId').value;
+            const formData = new FormData();
+            
+            formData.append('visit_date', document.getElementById('visitDate').value);
+            formData.append('notes', document.getElementById('notes').value);
+            
+            const rating = document.querySelector('.emoji-rating input:checked');
+            if (rating) formData.append('rating', rating.value);
+            
+            selectedFiles.forEach(file => {
+                formData.append('photos', file);
+            });
+            
+            try {
+                const response = await fetch(`/api/parks/${parkId}/visit/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    closeModal();
+                    showToast('Visit recorded! 🎉');
+                    
+                    // Reload after short delay to update markers
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showToast('Error: ' + JSON.stringify(data.errors), true);
+                }
+            } catch (error) {
+                showToast('Error saving visit', true);
+                console.error(error);
+            }
+        });
+        
+        // Toast notification
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.background = isError ? '#C13A28' : '#3A7D44';
+            toast.classList.add('show');
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
