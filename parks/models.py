@@ -53,10 +53,44 @@ class Park(models.Model):
         return self.visits.order_by('-visit_date').first()
 
 
+class Sign(models.Model):
+    """Model representing a sign at a park (e.g., rainbow sign)."""
+
+    park = models.ForeignKey(Park, on_delete=models.CASCADE, related_name='signs')
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+    sign_type = models.CharField(max_length=50, default='RAINBOW')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['park__name']
+
+    def __str__(self):
+        return f"{self.sign_type} sign at {self.park.name}"
+
+    @property
+    def is_visited(self):
+        """Check if this sign has been visited."""
+        return self.visits.exists()
+
+    @property
+    def visit_count(self):
+        """Get total number of visits to this sign."""
+        return self.visits.count()
+
+
 class Visit(models.Model):
     """Model representing a visit to a park."""
-    
+
     park = models.ForeignKey(Park, on_delete=models.CASCADE, related_name='visits')
+    sign = models.ForeignKey(
+        Sign,
+        on_delete=models.SET_NULL,
+        related_name='visits',
+        blank=True,
+        null=True,
+        help_text="Optional: specific sign visited"
+    )
     visit_date = models.DateField(default=timezone.now)
     notes = models.TextField(blank=True, null=True)
     rating = models.IntegerField(

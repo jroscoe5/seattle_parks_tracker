@@ -2,10 +2,11 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Count, Max
 import json
 
-from .models import Park, Visit, VisitPhoto
+from .models import Park, Sign, Visit, VisitPhoto
 from .forms import VisitForm, VisitPhotoForm
 
 
@@ -54,13 +55,17 @@ def parks_geojson(request):
             except json.JSONDecodeError:
                 boundary = None
 
-        # Parse rainbow sign locations if available
-        rainbow_sign_locations = None
-        if park.rainbow_sign_locations:
-            try:
-                rainbow_sign_locations = json.loads(park.rainbow_sign_locations)
-            except json.JSONDecodeError:
-                rainbow_sign_locations = None
+        # Get signs with their visit status
+        signs_data = []
+        for sign in park.signs.all():
+            signs_data.append({
+                'id': sign.id,
+                'latitude': sign.latitude,
+                'longitude': sign.longitude,
+                'sign_type': sign.sign_type,
+                'visited': sign.is_visited,
+                'visit_count': sign.visit_count,
+            })
 
         feature = {
             'type': 'Feature',
@@ -77,7 +82,7 @@ def parks_geojson(request):
                 'first_photo': first_photo,
                 'has_rainbow_sign': park.has_rainbow_sign,
                 'boundary': boundary,
-                'rainbow_sign_locations': rainbow_sign_locations,
+                'signs': signs_data,
             },
             'geometry': {
                 'type': 'Point',
@@ -109,8 +114,8 @@ def park_detail(request, pk):
 def park_detail_json(request, pk):
     """Return park details as JSON for popups."""
     park = get_object_or_404(Park, pk=pk)
-    visits = park.visits.prefetch_related('photos').all()
-    
+    visits = park.visits.prefetch_related('photos').select_related('sign').all()
+
     visits_data = []
     for visit in visits:
         photos = [{'url': photo.image.url, 'caption': photo.caption} for photo in visit.photos.all()]
@@ -120,8 +125,19 @@ def park_detail_json(request, pk):
             'notes': visit.notes or '',
             'rating': visit.rating,
             'photos': photos,
+            'sign_id': visit.sign_id,
         })
-    
+
+    signs_data = []
+    for sign in park.signs.all():
+        signs_data.append({
+            'id': sign.id,
+            'latitude': sign.latitude,
+            'longitude': sign.longitude,
+            'sign_type': sign.sign_type,
+            'visited': sign.is_visited,
+        })
+
     data = {
         'id': park.id,
         'name': park.name,
@@ -132,23 +148,43 @@ def park_detail_json(request, pk):
         'latitude': park.latitude,
         'longitude': park.longitude,
         'visits': visits_data,
+        'signs': signs_data,
     }
-    
+
     return JsonResponse(data)
 
 
+def park_signs_json(request, pk):
+    """Return signs for a park as JSON."""
+    park = get_object_or_404(Park, pk=pk)
+
+    signs_data = []
+    for sign in park.signs.all():
+        signs_data.append({
+            'id': sign.id,
+            'latitude': sign.latitude,
+            'longitude': sign.longitude,
+            'sign_type': sign.sign_type,
+            'visited': sign.is_visited,
+            'label': f"{sign.sign_type} sign #{sign.id}",
+        })
+
+    return JsonResponse({'signs': signs_data})
+
+
+@staff_member_required
 @require_http_methods(["GET", "POST"])
 def add_visit(request, park_id):
-    """Add a new visit to a park."""
+    """Add a new visit to a park. Restricted to admin users."""
     park = get_object_or_404(Park, pk=park_id)
-    
+
     if request.method == 'POST':
-        form = VisitForm(request.POST)
+        form = VisitForm(request.POST, park=park)
         if form.is_valid():
             visit = form.save(commit=False)
             visit.park = park
             visit.save()
-            
+
             # Handle multiple photo uploads
             photos = request.FILES.getlist('photos')
             for photo in photos:
@@ -156,9 +192,9 @@ def add_visit(request, park_id):
                     visit=visit,
                     image=photo,
                 )
-            
+
             messages.success(request, f'Visit to {park.name} recorded!')
-            
+
             # Return JSON response for AJAX requests
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({
@@ -166,33 +202,34 @@ def add_visit(request, park_id):
                     'message': f'Visit to {park.name} recorded!',
                     'visit_id': visit.id
                 })
-            
+
             return redirect('map_view')
     else:
-        form = VisitForm()
-    
+        form = VisitForm(park=park)
+
     context = {
         'park': park,
         'form': form,
     }
-    
+
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return render(request, 'parks/partials/visit_form.html', context)
-    
+
     return render(request, 'parks/add_visit.html', context)
 
 
+@staff_member_required
 @require_http_methods(["POST"])
 def add_visit_ajax(request, park_id):
-    """AJAX endpoint for adding a visit with photos."""
+    """AJAX endpoint for adding a visit with photos. Restricted to admin users."""
     park = get_object_or_404(Park, pk=park_id)
-    
-    form = VisitForm(request.POST)
+
+    form = VisitForm(request.POST, park=park)
     if form.is_valid():
         visit = form.save(commit=False)
         visit.park = park
         visit.save()
-        
+
         # Handle multiple photo uploads
         photos = request.FILES.getlist('photos')
         photo_urls = []
@@ -202,14 +239,14 @@ def add_visit_ajax(request, park_id):
                 image=photo,
             )
             photo_urls.append(visit_photo.image.url)
-        
+
         return JsonResponse({
             'success': True,
             'message': f'Visit to {park.name} recorded!',
             'visit_id': visit.id,
             'photos': photo_urls,
         })
-    
+
     return JsonResponse({
         'success': False,
         'errors': form.errors,

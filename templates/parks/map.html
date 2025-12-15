@@ -137,6 +137,12 @@
             border-radius: 50%;
             width: 12px !important;
             height: 12px !important;
+            cursor: pointer;
+        }
+
+        .rainbow-sign-marker.visited {
+            background: var(--rainbow-blue);
+            border-color: #14487a;
         }
         
         /* Popup styles */
@@ -638,12 +644,19 @@
                 <form id="visitForm" enctype="multipart/form-data">
                     {% csrf_token %}
                     <input type="hidden" id="parkId" name="park_id">
-                    
+
                     <div class="form-group">
                         <label for="visitDate">Visit Date</label>
                         <input type="date" class="form-control" id="visitDate" name="visit_date" required>
                     </div>
-                    
+
+                    <div class="form-group" id="signSelectGroup" style="display: none;">
+                        <label for="signSelect">Sign Visited</label>
+                        <select class="form-control" id="signSelect" name="sign">
+                            <option value="">Park visit (no specific sign)</option>
+                        </select>
+                    </div>
+
                     <div class="form-group">
                         <label>Worth coming back?</label>
                         <div class="emoji-rating">
@@ -694,6 +707,9 @@
     <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
     
     <script>
+        // Check if user is staff (can add visits)
+        const isStaff = {{ user.is_staff|yesno:"true,false,false" }};
+
         // Initialize map centered on Seattle
         const map = L.map('map').setView([47.6062, -122.3321], 12);
         
@@ -760,8 +776,15 @@
             iconAnchor: [6, 6]
         });
 
+        const rainbowSignVisitedIcon = L.divIcon({
+            className: 'rainbow-sign-marker visited',
+            iconSize: [12, 12],
+            iconAnchor: [6, 6]
+        });
+
         // Store all markers and layers
         let allParks = [];
+        let parkSignsData = {}; // Store signs by park ID
         const boundariesLayer = L.layerGroup();
         const rainbowSignsLayer = L.layerGroup(); // Not added by default
         
@@ -804,10 +827,13 @@
                         popupContent += `<img src="${props.first_photo}" class="photo-preview" alt="Park photo">`;
                     }
 
-                    popupContent += `
+                    if (isStaff) {
+                        popupContent += `
                             <button class="btn btn-primary" onclick="openVisitModal(${props.id}, '${props.name.replace(/'/g, "\\'")}')">
                                 ${props.visited ? 'Add Another Visit' : 'Record Visit'}
-                            </button>
+                            </button>`;
+                    }
+                    popupContent += `
                             <a href="/parks/${props.id}/" class="btn btn-secondary">View Details</a>
                         </div>
                     `;
@@ -844,11 +870,18 @@
                         boundariesLayer.addLayer(polygon);
                     }
 
-                    // Add all rainbow sign markers
-                    if (props.rainbow_sign_locations && props.rainbow_sign_locations.length > 0) {
-                        props.rainbow_sign_locations.forEach(signCoords => {
-                            const signMarker = L.marker([signCoords[1], signCoords[0]], { icon: rainbowSignIcon });
-                            signMarker.bindTooltip(`Rainbow Sign - ${props.name}`);
+                    // Store signs data for this park
+                    if (props.signs && props.signs.length > 0) {
+                        parkSignsData[props.id] = props.signs;
+
+                        // Add sign markers
+                        props.signs.forEach(sign => {
+                            const signIcon = sign.visited ? rainbowSignVisitedIcon : rainbowSignIcon;
+                            const signMarker = L.marker([sign.latitude, sign.longitude], { icon: signIcon });
+                            signMarker.bindTooltip(`${sign.sign_type} Sign - ${props.name}${sign.visited ? ' ✓' : ''}`);
+                            if (isStaff) {
+                                signMarker.on('click', () => openVisitModal(props.id, props.name, sign.id));
+                            }
                             rainbowSignsLayer.addLayer(signMarker);
                         });
                     }
@@ -927,17 +960,42 @@
         }
 
         // Modal functions
-        function openVisitModal(parkId, parkName) {
+        function openVisitModal(parkId, parkName, signId = null) {
             document.getElementById('parkId').value = parkId;
             document.getElementById('modalParkName').textContent = parkName;
             document.getElementById('visitDate').value = new Date().toISOString().split('T')[0];
             document.getElementById('visitModal').classList.add('active');
-            
+
             // Clear form
             document.getElementById('notes').value = '';
             document.querySelectorAll('.emoji-rating input').forEach(input => input.checked = false);
             document.getElementById('photoPreview').innerHTML = '';
             selectedFiles = [];
+
+            // Populate sign dropdown if park has signs
+            const signSelect = document.getElementById('signSelect');
+            const signSelectGroup = document.getElementById('signSelectGroup');
+            const signs = parkSignsData[parkId] || [];
+
+            // Reset dropdown
+            signSelect.innerHTML = '<option value="">Park visit (no specific sign)</option>';
+
+            if (signs.length > 0) {
+                signSelectGroup.style.display = 'block';
+                signs.forEach(sign => {
+                    const option = document.createElement('option');
+                    option.value = sign.id;
+                    option.textContent = `${sign.sign_type} sign${sign.visited ? ' (visited)' : ''}`;
+                    signSelect.appendChild(option);
+                });
+
+                // Pre-select sign if provided
+                if (signId) {
+                    signSelect.value = signId;
+                }
+            } else {
+                signSelectGroup.style.display = 'none';
+            }
         }
         
         function closeModal() {
@@ -1007,13 +1065,18 @@
             
             const parkId = document.getElementById('parkId').value;
             const formData = new FormData();
-            
+
             formData.append('visit_date', document.getElementById('visitDate').value);
             formData.append('notes', document.getElementById('notes').value);
-            
+
+            const signSelect = document.getElementById('signSelect');
+            if (signSelect.value) {
+                formData.append('sign', signSelect.value);
+            }
+
             const rating = document.querySelector('.emoji-rating input:checked');
             if (rating) formData.append('rating', rating.value);
-            
+
             selectedFiles.forEach(file => {
                 formData.append('photos', file);
             });

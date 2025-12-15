@@ -1,13 +1,20 @@
 from django import forms
-from .models import Visit, VisitPhoto
+from .models import Sign, Visit, VisitPhoto
 
 
 class VisitForm(forms.ModelForm):
     """Form for recording a park visit."""
-    
+
+    sign = forms.ModelChoiceField(
+        queryset=Sign.objects.none(),
+        required=False,
+        empty_label="Park visit (no specific sign)",
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+
     class Meta:
         model = Visit
-        fields = ['visit_date', 'notes', 'rating']
+        fields = ['sign', 'visit_date', 'notes', 'rating']
         widgets = {
             'visit_date': forms.DateInput(
                 attrs={
@@ -28,6 +35,11 @@ class VisitForm(forms.ModelForm):
                 }
             ),
         }
+
+    def __init__(self, *args, park=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if park:
+            self.fields['sign'].queryset = Sign.objects.filter(park=park)
 
 
 class VisitPhotoForm(forms.ModelForm):

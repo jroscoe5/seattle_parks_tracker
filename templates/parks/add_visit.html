@@ -235,7 +235,14 @@
                     <label for="id_visit_date">Visit Date</label>
                     {{ form.visit_date }}
                 </div>
-                
+
+                {% if park.signs.exists %}
+                <div class="form-group">
+                    <label for="id_sign">Sign Visited</label>
+                    {{ form.sign }}
+                </div>
+                {% endif %}
+
                 <div class="form-group">
                     <label>Worth coming back?</label>
                     <div class="emoji-rating">

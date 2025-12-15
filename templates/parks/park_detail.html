@@ -274,6 +274,12 @@
                         <label>Total Visits</label>
                         <span>{{ park.visit_count }}</span>
                     </div>
+                    {% if park.signs.exists %}
+                    <div class="info-item">
+                        <label>Rainbow Signs</label>
+                        <span>{{ park.signs.count }}</span>
+                    </div>
+                    {% endif %}
                     {% if park.address %}
                     <div class="info-item">
                         <label>Address</label>
@@ -291,14 +297,19 @@
         <div class="card">
             <div class="card-header">
                 <h2>Visit History</h2>
+                {% if user.is_staff %}
                 <a href="{% url 'add_visit' park.id %}" class="btn btn-primary">Add Visit</a>
+                {% endif %}
             </div>
             <div class="card-body">
                 {% if visits %}
                     {% for visit in visits %}
                     <div class="visit-card">
                         <div class="visit-header">
-                            <span class="visit-date">{{ visit.visit_date|date:"F j, Y" }}</span>
+                            <span class="visit-date">
+                                {{ visit.visit_date|date:"F j, Y" }}
+                                {% if visit.sign %}<span style="color: var(--rainbow-blue); font-size: 0.85rem; font-weight: normal;"> — {{ visit.sign.sign_type }} sign</span>{% endif %}
+                            </span>
                             {% if visit.rating %}
                             <span class="visit-rating">
                                 {% if visit.rating == 1 %}😭{% elif visit.rating == 2 %}😢{% elif visit.rating == 3 %}😐{% elif visit.rating == 4 %}😊{% elif visit.rating == 5 %}😎{% endif %}
@@ -321,8 +332,10 @@
                     {% endfor %}
                 {% else %}
                     <div class="empty-state">
-                        <p>You haven't visited this park yet.</p>
+                        <p>No visits recorded yet.</p>
+                        {% if user.is_staff %}
                         <a href="{% url 'add_visit' park.id %}" class="btn btn-primary">Record Your First Visit</a>
+                        {% endif %}
                     </div>
                 {% endif %}
             </div>
